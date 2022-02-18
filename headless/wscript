@@ -1,0 +1,70 @@
+#!/usr/bin/env python
+from waflib.extras import autowaf as autowaf
+from waflib import Options, TaskGen
+import waflib.Logs as Logs, waflib.Utils as Utils
+import os
+import shutil
+import sys
+import re
+import time
+from waflib.Task import Task
+
+# Mandatory variables
+top = '.'
+out = 'build'
+
+hardour_sources = [
+        'load_session.cc',
+        'misc.cc',
+]
+
+def options(opt):
+    autowaf.set_options(opt)
+
+def configure(conf):
+    conf.load('misc')
+
+
+def build(bld):
+
+    VERSION = "%s.%s" % (bld.env['MAJOR'], bld.env['MINOR'])
+
+    # just the normal executable version of the GTK GUI
+    obj = bld (features = 'cxx c cxxprogram')
+    # this program does not do the whole hidden symbols thing
+    obj.cxxflags = [ '-fvisibility=default' ]
+    obj.source    = hardour_sources
+    obj.target = 'hardour-' + str (bld.env['VERSION'])
+    obj.includes = ['.']
+    obj.use      = [ 'libpbd',
+                     'libardour',
+                     'libardour_cp',
+                     'libtemporal',
+                     'libmidipp',
+                     ]
+
+    obj.defines = [
+        'VERSIONSTRING="' + str(bld.env['VERSION']) + '"',
+        'DATA_DIR="' + os.path.normpath(bld.env['DATADIR']) + '"',
+        'CONFIG_DIR="' + os.path.normpath(bld.env['SYSCONFDIR']) + '"',
+        'LOCALEDIR="' + os.path.join(os.path.normpath(bld.env['DATADIR']), 'locale') + '"',
+        ]
+    obj.install_path = bld.env['LIBDIR']
+    obj.uselib       = 'UUID FLAC FONTCONFIG GLIBMM GIOMM GTHREAD OGG CURL DL XML'
+    obj.uselib       += ' AUDIOUNITS OSX'
+    obj.uselib       += ' FFTW3F LO TAGLIB LILV RUBBERBAND AUBIO LRDF ARCHIVE VAMPSDK VAMPHOSTSDK'
+
+    if bld.is_defined('HAVE_SUIL'):
+        obj.uselib += ' SUIL'
+
+    if sys.platform == 'darwin':
+        obj.uselib += ' AUDIOUNITS OSX'
+        obj.use    += ' libappleutility'
+    obj.includes += ['../libs']
+
+    if bld.env['build_target'] == 'mingw':
+        if bld.env['DEBUG'] == False:
+            obj.linkflags = ['-mwindows']
+
+    if bld.is_defined('NEED_INTL'):
+        obj.linkflags = ' -lintl'
